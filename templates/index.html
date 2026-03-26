@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIIBS — Cargo X-ray Intelligence</title>
+    <meta name="description" content="Real-Time Intelligent Cargo X-ray Risk Screening with Dual-Brain AI Vision and LLM Copilot">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- ═══ Header ═══ -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <div class="logo-icon">🛡️</div>
+                <div>
+                    <div class="logo-text">CIIBS</div>
+                    <div class="logo-sub">Cargo X-ray Intelligence System • Dual-Brain AI</div>
+                </div>
+            </div>
+            <div style="display:flex; gap:0.75rem; align-items:center;">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="statusText">System Online</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══ Main ═══ -->
+    <div class="main-container">
+        <!-- ─── Sidebar ─── -->
+        <aside class="sidebar">
+            <div class="card">
+                <div class="card-title"><span class="icon">⚡</span> Detection Mode</div>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-mode="realtime" onclick="setMode('realtime')">🚀 Realtime</button>
+                    <button class="toggle-btn" data-mode="accuracy" onclick="setMode('accuracy')">🎯 Accuracy</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">📷</span> Input Source</div>
+                <div class="input-tabs">
+                    <button class="input-tab active" data-source="upload" onclick="setSource('upload')">📁 Upload</button>
+                    <button class="input-tab" data-source="webcam" onclick="setSource('webcam')">🎥 Live</button>
+                </div>
+                <div id="uploadSection">
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon">📂</div>
+                        <p>Drop X-ray image here</p>
+                        <p class="upload-hint">JPG, PNG • Max 20MB</p>
+                        <input type="file" id="fileInput" accept="image/*">
+                    </div>
+                    <img id="uploadPreview" class="upload-preview hidden" alt="Preview">
+                </div>
+                <div id="webcamSection" class="hidden">
+                    <div class="webcam-container">
+                        <video id="webcamVideo" autoplay muted playsinline></video>
+                        <canvas id="webcamCanvas" class="hidden"></canvas>
+                    </div>
+                    <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+                        <button class="toggle-btn active" style="flex:1" id="btnStartCam" onclick="toggleWebcam()">▶️ Start</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">📋</span> Cargo Declaration</div>
+                <textarea class="input-field" id="declaredCargo" placeholder="e.g. electronics, clothing, food&#10;Leave blank to skip"></textarea>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">🤖</span> AI Copilot</div>
+                <div class="switch-row">
+                    <span class="switch-label">Vision AI Analysis</span>
+                    <label class="switch">
+                        <input type="checkbox" id="llmToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <p style="font-size:0.65rem;color:var(--text-muted);margin-top:0.3rem;">
+                    Enables Dual-Brain Vision + LLM explanations.
+                </p>
+            </div>
+
+            <button class="btn-analyze" id="btnAnalyze" onclick="analyzeImage()">
+                <span class="spinner"></span>
+                <span class="btn-text">🔍 Analyze Scan</span>
+            </button>
+
+            <div class="card" id="perfCard" style="display:none;">
+                <div class="card-title"><span class="icon">📊</span> Performance</div>
+                <div class="perf-row"><span class="perf-label">Inference</span><span class="perf-value" id="perfInference">—</span></div>
+                <div class="perf-row"><span class="perf-label">Total</span><span class="perf-value" id="perfTotal">—</span></div>
+                <div class="perf-row"><span class="perf-label">FPS</span><span class="perf-value" id="perfFPS">—</span></div>
+                <div class="perf-row"><span class="perf-label">LLM</span><span class="perf-value" id="perfLLM">—</span></div>
+                <div class="perf-row"><span class="perf-label">Vision</span><span class="perf-value" id="perfVLM">—</span></div>
+            </div>
+        </aside>
+
+        <!-- ─── Results Area ─── -->
+        <main class="results-area" id="resultsArea">
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">🛡️</div>
+                <h3>Ready to Scan</h3>
+                <p>Upload an X-ray image or start live camera mode to begin real-time cargo screening with Dual-Brain AI analysis.</p>
+            </div>
+
+            <div id="resultsContent" class="hidden">
+                <!-- Risk Banner -->
+                <div class="card risk-banner animate-in">
+                    <div class="risk-metric">
+                        <div class="metric-value risk-score-value" id="riskScoreVal">0</div>
+                        <div class="metric-label">Risk Score</div>
+                    </div>
+                    <div class="risk-divider"></div>
+                    <div class="risk-metric">
+                        <div class="metric-value"><span class="risk-level-badge" id="riskLevelBadge">—</span></div>
+                        <div class="metric-label">Risk Level</div>
+                    </div>
+                    <div class="risk-divider"></div>
+                    <div class="risk-metric">
+                        <div class="metric-value" id="anomalyVal" style="color:var(--accent-cyan)">0%</div>
+                        <div class="metric-label">Anomaly Index</div>
+                    </div>
+                    <div class="risk-divider"></div>
+                    <div class="risk-metric">
+                        <div class="metric-value" id="concealVal" style="color:var(--accent-pink)">0%</div>
+                        <div class="metric-label">Concealment</div>
+                    </div>
+                    <div class="risk-divider"></div>
+                    <div class="risk-metric">
+                        <div class="metric-value" id="detCountVal" style="color:var(--accent-purple)">0</div>
+                        <div class="metric-label">Detections</div>
+                    </div>
+                </div>
+
+                <!-- Risk Breakdown -->
+                <div class="card animate-in" style="animation-delay:0.1s">
+                    <div class="card-title"><span class="icon">📈</span> 6-Signal Risk Fusion</div>
+                    <div class="risk-gauge-container">
+                        <div class="risk-gauge">
+                            <div class="risk-gauge-fill" id="riskGaugeFill"></div>
+                        </div>
+                        <div class="risk-gauge-labels">
+                            <span>CLEAR</span><span>LOW</span><span>MEDIUM</span><span>HIGH</span><span>CRITICAL</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:0.75rem;">
+                        <div class="breakdown-row">
+                            <span class="breakdown-label">Detection</span>
+                            <div class="breakdown-bar"><div class="breakdown-fill" id="bdDet" style="background:var(--accent-blue);width:0%"></div></div>
+                            <span class="breakdown-value" id="bdDetVal">0</span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span class="breakdown-label">Anomaly</span>
+                            <div class="breakdown-bar"><div class="breakdown-fill" id="bdAnom" style="background:var(--accent-cyan);width:0%"></div></div>
+                            <span class="breakdown-value" id="bdAnomVal">0</span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span class="breakdown-label">Mismatch</span>
+                            <div class="breakdown-bar"><div class="breakdown-fill" id="bdMis" style="background:var(--accent-orange);width:0%"></div></div>
+                            <span class="breakdown-value" id="bdMisVal">0</span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span class="breakdown-label">Material</span>
+                            <div class="breakdown-bar"><div class="breakdown-fill" id="bdMat" style="background:var(--accent-pink);width:0%"></div></div>
+                            <span class="breakdown-value" id="bdMatVal">0</span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span class="breakdown-label">Concealment</span>
+                            <div class="breakdown-bar"><div class="breakdown-fill" id="bdCon" style="background:var(--accent-purple);width:0%"></div></div>
+                            <span class="breakdown-value" id="bdConVal">0</span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span class="breakdown-label">VLM Cross-Val</span>
+                            <div class="breakdown-bar"><div class="breakdown-fill" id="bdVLM" style="background:var(--accent-green);width:0%"></div></div>
+                            <span class="breakdown-value" id="bdVLMVal">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Panels -->
+                <div class="image-grid animate-in" style="animation-delay:0.2s">
+                    <div class="image-panel" id="panelOriginal">
+                        <span class="panel-label">Original Scan</span>
+                        <div class="image-placeholder"><span class="placeholder-icon">🖼️</span><p>No image</p></div>
+                    </div>
+                    <div class="image-panel" id="panelDetections">
+                        <span class="panel-label">Detections + Material</span>
+                        <div class="image-placeholder"><span class="placeholder-icon">🎯</span><p>No detections</p></div>
+                    </div>
+                    <div class="image-panel" id="panelHeatmap">
+                        <span class="panel-label">Anomaly Heatmap</span>
+                        <div class="image-placeholder"><span class="placeholder-icon">🌡️</span><p>No heatmap</p></div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: 3 columns -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;" class="animate-in" style="animation-delay:0.3s">
+                    <!-- Detections List + Material -->
+                    <div class="card">
+                        <div class="card-title"><span class="icon">🎯</span> Detected Items</div>
+                        <div class="detection-list" id="detectionList">
+                            <p style="font-size:0.8rem;color:var(--text-muted);">No items detected</p>
+                        </div>
+                    </div>
+
+                    <!-- AI Assessment -->
+                    <div class="card">
+                        <div class="card-title"><span class="icon">💡</span> AI Assessment</div>
+                        <div class="explanation-text" id="explanationText">Awaiting analysis...</div>
+                        <div class="explanation-source" id="explanationSource"></div>
+                    </div>
+
+                    <!-- Vision Analysis — Dual Brain ⭐ -->
+                    <div class="card" id="vlmCard" style="border-color:rgba(139,92,246,0.2);">
+                        <div class="card-title" style="color:var(--accent-purple);">
+                            <span class="icon">🧠</span> Vision Analysis
+                            <span style="font-size:0.55rem;padding:0.1rem 0.4rem;background:rgba(139,92,246,0.15);color:var(--accent-purple);border-radius:4px;margin-left:auto;text-transform:none;letter-spacing:0;">DUAL-BRAIN</span>
+                        </div>
+                        <div class="explanation-text" id="vlmText" style="font-size:0.78rem;">
+                            Enable Vision AI toggle to activate independent vision analysis.
+                        </div>
+                        <div class="explanation-source" id="vlmSource"></div>
+                    </div>
+                </div>
+
+                <!-- Concealment + Material Summary -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" class="animate-in" style="animation-delay:0.4s">
+                    <div class="card">
+                        <div class="card-title"><span class="icon">🕵️</span> Concealment Analysis</div>
+                        <div id="concealmentDetails" style="font-size:0.8rem;color:var(--text-secondary);">
+                            Awaiting analysis...
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title"><span class="icon">🔬</span> Material Composition</div>
+                        <div id="materialDetails" style="font-size:0.8rem;color:var(--text-secondary);">
+                            Awaiting analysis...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan History -->
+                <div class="card animate-in" style="animation-delay:0.5s">
+                    <div class="card-title"><span class="icon">📊</span> Scan History</div>
+                    <div id="scanHistory" style="display:flex;gap:0.4rem;overflow-x:auto;padding:0.25rem 0;">
+                        <p style="font-size:0.75rem;color:var(--text-muted);">No scans yet</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    let currentMode = 'realtime';
+    let currentSource = 'upload';
+    let selectedFile = null;
+    let webcamStream = null;
+    let webcamInterval = null;
+    let socket = null;
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.toggle-btn[data-mode]').forEach(b =>
+            b.classList.toggle('active', b.dataset.mode === mode));
+    }
+
+    function setSource(source) {
+        currentSource = source;
+        document.querySelectorAll('.input-tab').forEach(b =>
+            b.classList.toggle('active', b.dataset.source === source));
+        document.getElementById('uploadSection').classList.toggle('hidden', source !== 'upload');
+        document.getElementById('webcamSection').classList.toggle('hidden', source !== 'webcam');
+        if (source === 'upload' && webcamStream) stopWebcam();
+    }
+
+    // File upload
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadPreview = document.getElementById('uploadPreview');
+
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault(); uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+    function handleFile(file) {
+        selectedFile = file;
+        const reader = new FileReader();
+        reader.onload = e => { uploadPreview.src = e.target.result; uploadPreview.classList.remove('hidden'); };
+        reader.readAsDataURL(file);
+    }
+
+    // Analyze
+    async function analyzeImage() {
+        if (!selectedFile && currentSource === 'upload') { alert('Please select an image first'); return; }
+        const btn = document.getElementById('btnAnalyze');
+        btn.classList.add('loading'); btn.disabled = true;
+        try {
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('mode', currentMode);
+            formData.append('declared_cargo', document.getElementById('declaredCargo').value);
+            formData.append('use_llm', document.getElementById('llmToggle').checked);
+            const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+            if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Analysis failed'); }
+            const data = await response.json();
+            displayResults(data);
+        } catch (err) { alert('Error: ' + err.message); console.error(err); }
+        finally { btn.classList.remove('loading'); btn.disabled = false; }
+    }
+
+    // Display results
+    function displayResults(data) {
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('resultsContent').classList.remove('hidden');
+
+        // Risk score
+        const riskVal = document.getElementById('riskScoreVal');
+        riskVal.textContent = data.risk_score;
+        riskVal.className = 'metric-value risk-score-value ' + data.risk_level.toLowerCase();
+
+        const badge = document.getElementById('riskLevelBadge');
+        badge.textContent = data.risk_level;
+        badge.className = 'risk-level-badge ' + data.risk_level.toLowerCase();
+
+        document.getElementById('anomalyVal').textContent = Math.round(data.anomaly_score * 100) + '%';
+        document.getElementById('concealVal').textContent = Math.round((data.concealment_score || 0) * 100) + '%';
+        document.getElementById('detCountVal').textContent = data.detection_count;
+
+        // Gauge
+        const gaugeFill = document.getElementById('riskGaugeFill');
+        gaugeFill.style.width = data.risk_score + '%';
+        if (data.risk_score >= 80) gaugeFill.style.background = 'var(--gradient-danger)';
+        else if (data.risk_score >= 70) gaugeFill.style.background = 'var(--accent-orange)';
+        else if (data.risk_score >= 35) gaugeFill.style.background = 'var(--gradient-warn)';
+        else gaugeFill.style.background = 'var(--gradient-success)';
+
+        // 6-signal breakdown
+        const bd = data.risk_breakdown;
+        setBreakdown('bdDet', 'bdDetVal', bd.detection_component, 35);
+        setBreakdown('bdAnom', 'bdAnomVal', bd.anomaly_component, 20);
+        setBreakdown('bdMis', 'bdMisVal', bd.mismatch_component, 15);
+        setBreakdown('bdMat', 'bdMatVal', bd.material_component || 0, 10);
+        setBreakdown('bdCon', 'bdConVal', bd.concealment_component || 0, 10);
+        setBreakdown('bdVLM', 'bdVLMVal', bd.vlm_component || 0, 10);
+
+        // Images
+        setImage('panelOriginal', uploadPreview.src, 'Original Scan');
+        setImage('panelDetections', 'data:image/jpeg;base64,' + data.annotated_image, 'Detections + Material');
+        setImage('panelHeatmap', 'data:image/jpeg;base64,' + data.heatmap_overlay, 'Anomaly Heatmap');
+
+        // Detection list with material badges
+        const listEl = document.getElementById('detectionList');
+        if (data.detections.length === 0) {
+            listEl.innerHTML = '<p style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">✅ No prohibited items detected</p>';
+        } else {
+            listEl.innerHTML = data.detections.map((d, i) => {
+                const matColor = d.material_type === 'Metallic' ? 'var(--accent-blue)' : d.material_type === 'Organic' ? 'var(--accent-green)' : 'var(--accent-yellow)';
+                return `<div class="detection-item" style="animation-delay:${i*0.05}s">
+                    <span class="det-threat t${d.threat_level}"></span>
+                    <span class="det-class">${d.class}</span>
+                    <span style="font-size:0.55rem;padding:0.1rem 0.3rem;background:${matColor}22;color:${matColor};border-radius:3px;font-weight:600;">${d.material_type || '?'}</span>
+                    <span class="det-conf">${Math.round(d.confidence*100)}%</span>
+                    <div class="det-conf-bar"><div class="det-conf-fill" style="width:${d.confidence*100}%;background:${getConfColor(d.confidence)}"></div></div>
+                </div>`;
+            }).join('');
+        }
+
+        // Explanation
+        document.getElementById('explanationText').textContent = data.explanation;
+        const srcEl = document.getElementById('explanationSource');
+        const srcClass = data.explanation_source === 'gemini' ? '' : 'template';
+        srcEl.innerHTML = `Source: <span class="source-badge ${srcClass}">${data.explanation_source === 'gemini' ? '🤖 AI' : '📝 Template'}</span>`;
+
+        // Vision dual-brain
+        const vlmText = document.getElementById('vlmText');
+        const vlmSource = document.getElementById('vlmSource');
+        if (data.vlm_analysis && data.vlm_source !== 'disabled') {
+            vlmText.textContent = data.vlm_analysis;
+            vlmSource.innerHTML = `Source: <span class="source-badge">🧠 ${data.vlm_source}</span> • ${data.vlm_latency_ms}ms`;
+        } else {
+            vlmText.textContent = 'Enable Vision AI toggle for independent vision analysis of the X-ray scan.';
+            vlmSource.innerHTML = '';
+        }
+
+        // Concealment details
+        const ci = data.concealment_info || {};
+        document.getElementById('concealmentDetails').innerHTML = `
+            <div style="margin-bottom:0.5rem;">${ci.message || 'No data'}</div>
+            <div class="breakdown-row"><span class="breakdown-label">Overlap</span>
+                <div class="breakdown-bar"><div class="breakdown-fill" style="background:var(--accent-pink);width:${(ci.overlap_score||0)*100}%"></div></div>
+                <span class="breakdown-value">${((ci.overlap_score||0)*100).toFixed(0)}%</span></div>
+            <div class="breakdown-row"><span class="breakdown-label">Edge Break</span>
+                <div class="breakdown-bar"><div class="breakdown-fill" style="background:var(--accent-orange);width:${(ci.edge_score||0)*100}%"></div></div>
+                <span class="breakdown-value">${((ci.edge_score||0)*100).toFixed(0)}%</span></div>
+            <div class="breakdown-row"><span class="breakdown-label">Density Anom.</span>
+                <div class="breakdown-bar"><div class="breakdown-fill" style="background:var(--accent-purple);width:${(ci.density_score||0)*100}%"></div></div>
+                <span class="breakdown-value">${((ci.density_score||0)*100).toFixed(0)}%</span></div>`;
+
+        // Material details
+        const mi = data.material_info || {};
+        document.getElementById('materialDetails').innerHTML = `
+            <p>${mi.message || 'No material data'}</p>
+            ${mi.metallic_count > 0 ? `<p style="margin-top:0.3rem;">Avg metallic score: <strong>${((mi.avg_metallic_score||0)*100).toFixed(0)}%</strong></p>` : ''}
+            ${mi.organic_declared ? '<p style="color:var(--accent-orange);margin-top:0.25rem;">⚠️ Metallic items in organic-declared cargo</p>' : ''}`;
+
+        // Perf
+        const perfCard = document.getElementById('perfCard');
+        perfCard.style.display = 'block';
+        document.getElementById('perfInference').textContent = data.inference_time_ms + 'ms';
+        document.getElementById('perfTotal').textContent = data.total_time_ms + 'ms';
+        document.getElementById('perfFPS').textContent = data.fps;
+        document.getElementById('perfLLM').textContent = data.llm_latency_ms ? data.llm_latency_ms + 'ms' : '—';
+        document.getElementById('perfVLM').textContent = data.vlm_latency_ms ? data.vlm_latency_ms + 'ms' : '—';
+
+        // Update scan history
+        updateScanHistory(data);
+    }
+
+    function setBreakdown(fillId, valId, value, max) {
+        const pct = Math.min(100, (value / max) * 100);
+        document.getElementById(fillId).style.width = pct + '%';
+        document.getElementById(valId).textContent = value.toFixed(1);
+    }
+
+    function setImage(panelId, src, label) {
+        const panel = document.getElementById(panelId);
+        panel.innerHTML = `<span class="panel-label">${label}</span><img src="${src}" alt="${label}">`;
+    }
+
+    function getConfColor(conf) {
+        if (conf >= 0.7) return 'var(--accent-red)';
+        if (conf >= 0.5) return 'var(--accent-orange)';
+        if (conf >= 0.3) return 'var(--accent-yellow)';
+        return 'var(--accent-green)';
+    }
+
+    // Scan history
+    let historyData = [];
+    function updateScanHistory(data) {
+        historyData.unshift({
+            time: new Date().toLocaleTimeString(),
+            score: data.risk_score,
+            level: data.risk_level,
+            dets: data.detection_count
+        });
+        if (historyData.length > 20) historyData.pop();
+        const el = document.getElementById('scanHistory');
+        el.innerHTML = historyData.map(h => {
+            const c = h.level === 'CRITICAL' ? 'var(--accent-red)' : h.level === 'HIGH' ? 'var(--accent-orange)' : h.level === 'MEDIUM' ? 'var(--accent-yellow)' : 'var(--accent-green)';
+            return `<div style="min-width:60px;padding:0.4rem 0.5rem;background:rgba(255,255,255,0.03);border:1px solid ${c}33;border-radius:8px;text-align:center;flex-shrink:0;">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;color:${c}">${h.score}</div>
+                <div style="font-size:0.55rem;color:var(--text-muted);margin-top:0.15rem;">${h.time}</div>
+                <div style="font-size:0.5rem;color:var(--text-muted);">${h.dets} det</div>
+            </div>`;
+        }).join('');
+    }
+
+    // Webcam
+    async function toggleWebcam() {
+        const btn = document.getElementById('btnStartCam');
+        if (webcamStream) { stopWebcam(); btn.textContent = '▶️ Start'; }
+        else { await startWebcam(); btn.textContent = '⏹️ Stop'; }
+    }
+
+    async function startWebcam() {
+        try {
+            webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+            document.getElementById('webcamVideo').srcObject = webcamStream;
+            if (!socket) { socket = io(); socket.on('frame_result', handleLiveResult); }
+            const canvas = document.getElementById('webcamCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 640; canvas.height = 480;
+            webcamInterval = setInterval(() => {
+                ctx.drawImage(document.getElementById('webcamVideo'), 0, 0, 640, 480);
+                socket.emit('analyze_frame', {
+                    frame: canvas.toDataURL('image/jpeg', 0.7),
+                    mode: currentMode,
+                    declared_cargo: document.getElementById('declaredCargo').value
+                });
+            }, currentMode === 'realtime' ? 200 : 500);
+        } catch (err) { alert('Webcam error: ' + err.message); }
+    }
+
+    function stopWebcam() {
+        if (webcamInterval) { clearInterval(webcamInterval); webcamInterval = null; }
+        if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+    }
+
+    function handleLiveResult(data) {
+        if (data.error) return;
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('resultsContent').classList.remove('hidden');
+        const riskVal = document.getElementById('riskScoreVal');
+        riskVal.textContent = data.risk_score;
+        riskVal.className = 'metric-value risk-score-value ' + data.risk_level.toLowerCase();
+        document.getElementById('riskLevelBadge').textContent = data.risk_level;
+        document.getElementById('riskLevelBadge').className = 'risk-level-badge ' + data.risk_level.toLowerCase();
+        document.getElementById('anomalyVal').textContent = Math.round(data.anomaly_score * 100) + '%';
+        document.getElementById('concealVal').textContent = Math.round((data.concealment_score||0) * 100) + '%';
+        document.getElementById('detCountVal').textContent = data.detection_count;
+        const gaugeFill = document.getElementById('riskGaugeFill');
+        gaugeFill.style.width = data.risk_score + '%';
+        setImage('panelDetections', 'data:image/jpeg;base64,' + data.annotated_image, '🎯 Live');
+        setImage('panelHeatmap', 'data:image/jpeg;base64,' + data.heatmap_overlay, '🌡️ Live');
+        document.getElementById('perfCard').style.display = 'block';
+        document.getElementById('perfFPS').textContent = data.fps;
+        document.getElementById('perfInference').textContent = data.inference_time_ms + 'ms';
+        document.getElementById('explanationText').textContent = data.explanation;
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+        fetch('/api/status').then(r => r.json()).then(d => {
+            document.getElementById('statusText').textContent = `Online • ${d.models_loaded.length} model(s)`;
+        }).catch(() => { document.getElementById('statusText').textContent = 'Connecting...'; });
+    });
+    </script>
+</body>
+</html>

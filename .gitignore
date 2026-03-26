@@ -1,0 +1,17 @@
+# Python caches
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Model weights (too large for git)
+*.pt
+datasets/
+
+# IDE files
+.vscode/
+.idea/
+.DS_Store
